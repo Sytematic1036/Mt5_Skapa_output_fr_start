@@ -8,7 +8,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git branch:*)",
+      "Bash(venvScriptspip install pandas yfinance openpyxl)",
+      "Bash(C:/Users/macka/Koder/Mt5_Skapa_output_fr_start/venv/Scripts/pip install:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(ls:*)"
     ]
   }
 }
