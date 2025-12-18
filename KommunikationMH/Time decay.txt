@@ -3,8 +3,6 @@ Predictive Indicators Generator
 ===============================
 Adds the following columns to all instrument files:
 - ATR14
-- ATR26
-- ADX, +DI, -DI
 - EMA50
 - TrendStrength
 - TrendDir
@@ -38,8 +36,6 @@ COL_CLOSE = "close"
 
 # Lookback periods
 ATR_PERIOD = 14
-ATR_PERIOD_26 = 26
-ADX_PERIOD = 14  # Standard ADX period
 EMA_PERIOD = 50
 SLOPE_LOOKBACK = 10
 MOM_LOOKBACK = 10
@@ -171,71 +167,6 @@ def wilder_atr(high, low, close, period=14):
     return atr
 
 
-def calculate_adx(high, low, close, period=14):
-    """
-    Calculate ADX (Average Directional Index) with +DI and -DI
-
-    Returns: DataFrame with columns ['ADX', 'PlusDI', 'MinusDI']
-
-    Steps:
-    1. Calculate directional movements (+DM, -DM)
-    2. Calculate directional indicators (+DI, -DI)
-    3. Calculate DX (Directional Movement Index)
-    4. Calculate ADX as EMA of DX
-    """
-    # Calculate True Range
-    prev_close = close.shift(1)
-    tr = pd.concat([
-        (high - low).abs(),
-        (high - prev_close).abs(),
-        (low - prev_close).abs(),
-    ], axis=1).max(axis=1)
-
-    # Step 1: Calculate Directional Movements
-    high_diff = high - high.shift(1)
-    low_diff = low.shift(1) - low
-
-    # +DM: High diff if positive and greater than low diff, else 0
-    plus_dm = np.where(
-        (high_diff > low_diff) & (high_diff > 0),
-        high_diff,
-        0.0
-    )
-    plus_dm = pd.Series(plus_dm, index=high.index)
-
-    # -DM: Low diff if positive and greater than high diff, else 0
-    minus_dm = np.where(
-        (low_diff > high_diff) & (low_diff > 0),
-        low_diff,
-        0.0
-    )
-    minus_dm = pd.Series(minus_dm, index=high.index)
-
-    # Smooth TR, +DM, -DM using Wilder's smoothing (EMA with alpha=1/period)
-    alpha = 1.0 / period
-    atr_smooth = tr.ewm(alpha=alpha, adjust=False, min_periods=period).mean()
-    plus_dm_smooth = plus_dm.ewm(alpha=alpha, adjust=False, min_periods=period).mean()
-    minus_dm_smooth = minus_dm.ewm(alpha=alpha, adjust=False, min_periods=period).mean()
-
-    # Step 2: Calculate Directional Indicators
-    plus_di = 100 * plus_dm_smooth / atr_smooth.replace(0, np.nan)
-    minus_di = 100 * minus_dm_smooth / atr_smooth.replace(0, np.nan)
-
-    # Step 3: Calculate DX
-    di_sum = plus_di + minus_di
-    di_diff = (plus_di - minus_di).abs()
-    dx = 100 * di_diff / di_sum.replace(0, np.nan)
-
-    # Step 4: Calculate ADX as EMA of DX
-    adx = dx.ewm(alpha=alpha, adjust=False, min_periods=period).mean()
-
-    return pd.DataFrame({
-        'ADX': adx,
-        'PlusDI': plus_di,
-        'MinusDI': minus_di
-    })
-
-
 def ema(series, period):
     """Exponential Moving Average"""
     return series.ewm(span=period, adjust=False, min_periods=period).mean()
@@ -336,18 +267,9 @@ def add_indicators(df, regime_df):
     high = out[COL_HIGH].astype(float)
     low = out[COL_LOW].astype(float)
 
-    # --- ATR (14 and 26 periods) ---
+    # --- ATR ---
     atr = wilder_atr(high, low, close, period=ATR_PERIOD)
     out["ATR14"] = atr
-
-    atr26 = wilder_atr(high, low, close, period=ATR_PERIOD_26)
-    out["ATR26"] = atr26
-
-    # --- ADX with +DI and -DI ---
-    adx_df = calculate_adx(high, low, close, period=ADX_PERIOD)
-    out["ADX"] = adx_df["ADX"]
-    out["PlusDI"] = adx_df["PlusDI"]
-    out["MinusDI"] = adx_df["MinusDI"]
 
     # --- EMA & TrendStrength ---
     e = ema(close, EMA_PERIOD)
@@ -500,8 +422,6 @@ def main():
 
     print("\nNew columns added:")
     print("  - ATR14")
-    print("  - ATR26")
-    print("  - ADX, PlusDI, MinusDI")
     print("  - EMA50")
     print("  - TrendStrength")
     print("  - TrendDir")
